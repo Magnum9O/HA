@@ -1,8 +1,7 @@
 blueprint:
-  name: "Pulizie Automation Blueprint"
+  name: "Blueprint Pulizie Mattina e Sera"
   description: >-
-    Blueprint per gestire un singolo task di pulizia mattutina o serale
-    con script.pulisci_stanza.
+    Blueprint per automazione pulizie mattina e sera con chiamata a script.pulisci_stanza.
   domain: automation
   input:
     morning_time:
@@ -17,7 +16,6 @@ blueprint:
       name: "Giorni pulizia mattutina"
       selector:
         select:
-          multiple: true
           options:
             - lunedì
             - martedì
@@ -26,11 +24,11 @@ blueprint:
             - venerdì
             - sabato
             - domenica
+          multiple: true
     days_evening:
       name: "Giorni pulizia serale"
       selector:
         select:
-          multiple: true
           options:
             - lunedì
             - martedì
@@ -39,8 +37,9 @@ blueprint:
             - venerdì
             - sabato
             - domenica
-    cleaned_boolean:
-      name: "Flag pulizia effettuata"
+          multiple: true
+    cleaned_today:
+      name: "Flag pulita oggi"
       selector:
         entity:
           domain: input_boolean
@@ -51,26 +50,28 @@ blueprint:
           domain: sensor
     end_states:
       name: "Stati fine pulizia"
+      description: "Stati del sensore che indicano la fine del ciclo"
       selector:
         select:
-          multiple: true
           options:
             - idle
             - sleeping
             - charging
+          multiple: true
     away_counter:
       name: "Contatore away/home"
+      description: "1 = fuori casa"
       selector:
         entity:
           domain: counter
-    morning_segment:
+    morning_segment_id:
       name: "Segment ID mattino"
       selector:
         number:
           min: 1
-          max: 100
+          max: 999
           step: 1
-    morning_type:
+    morning_clean_type:
       name: "Tipo pulizia mattino"
       selector:
         select:
@@ -79,14 +80,14 @@ blueprint:
             - lavaggio
             - genius
             - genius_deep
-    evening_segment:
+    evening_segment_id:
       name: "Segment ID sera"
       selector:
         number:
           min: 1
-          max: 100
+          max: 999
           step: 1
-    evening_type:
+    evening_clean_type:
       name: "Tipo pulizia sera"
       selector:
         select:
@@ -95,14 +96,14 @@ blueprint:
             - lavaggio
             - genius
             - genius_deep
-    away_segment:
+    away_segment_id:
       name: "Segment ID sera (fuori)"
       selector:
         number:
           min: 1
-          max: 100
+          max: 999
           step: 1
-    away_type:
+    away_clean_type:
       name: "Tipo pulizia sera (fuori)"
       selector:
         select:
@@ -112,51 +113,46 @@ blueprint:
             - genius
             - genius_deep
 trigger:
-  - platform: time
+  - id: morning
+    platform: time
     at: !input morning_time
-    id: morning
-  - platform: time
+  - id: evening
+    platform: time
     at: !input evening_time
-    id: evening
 condition: []
 action:
   - choose:
+      # Mattina
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.id == 'morning' and
-                 now().strftime('%A').lower() in
-                   (input.days_morning | map('lower') | list) and
-                 is_state(input.cleaned_boolean, 'off') }}
+              {{ trigger.id == 'morning'
+                 and now().strftime('%A').lower() in
+                   (input.days_morning | map('lower') | list)
+                 and is_state(input.cleaned_today, 'off') }}
         sequence:
           - service: script.turn_on
             target:
               entity_id: script.pulisci_stanza
             data:
               variables:
-                segment_id: "{{ input.morning_segment }}"
-                tipo_pulizia: "{{ input.morning_type }}"
-          - wait_for_trigger:
-              - platform: state
-                entity_id: !input vacuum_sensor
-                to: "idle"
-              - platform: state
-                entity_id: !input vacuum_sensor
-                to: "sleeping"
-              - platform: state
-                entity_id: !input vacuum_sensor
-                to: "charging"
+                segment_id: "{{ input.morning_segment_id }}"
+                tipo_pulizia: "{{ input.morning_clean_type }}"
+          - wait_template: >-
+              {{ states[input.vacuum_sensor].state in input.end_states }}
           - service: input_boolean.turn_on
             target:
-              entity_id: !input cleaned_boolean
+              entity_id: !input cleaned_today
+      # Sera
       - conditions:
           - condition: template
             value_template: >-
-              {{ trigger.id == 'evening' and
-                 now().strftime('%A').lower() in
+              {{ trigger.id == 'evening'
+                 and now().strftime('%A').lower() in
                    (input.days_evening | map('lower') | list) }}
         sequence:
           - choose:
+              # Fuori casa
               - conditions:
                   - condition: state
                     entity_id: !input away_counter
@@ -167,37 +163,22 @@ action:
                       entity_id: script.pulisci_stanza
                     data:
                       variables:
-                        segment_id: "{{ input.away_segment }}"
-                        tipo_pulizia: "{{ input.away_type }}"
-                  - wait_for_trigger:
-                      - platform: state
-                        entity_id: !input vacuum_sensor
-                        to: "idle"
-                      - platform: state
-                        entity_id: !input vacuum_sensor
-                        to: "sleeping"
-                      - platform: state
-                        entity_id: !input vacuum_sensor
-                        to: "charging"
+                        segment_id: "{{ input.away_segment_id }}"
+                        tipo_pulizia: "{{ input.away_clean_type }}"
+                  - wait_template: >-
+                      {{ states[input.vacuum_sensor].state in input.end_states }}
+              # In casa (default)
               - default:
                   - service: script.turn_on
                     target:
                       entity_id: script.pulisci_stanza
                     data:
                       variables:
-                        segment_id: "{{ input.evening_segment }}"
-                        tipo_pulizia: "{{ input.evening_type }}"
-                  - wait_for_trigger:
-                      - platform: state
-                        entity_id: !input vacuum_sensor
-                        to: "idle"
-                      - platform: state
-                        entity_id: !input vacuum_sensor
-                        to: "sleeping"
-                      - platform: state
-                        entity_id: !input vacuum_sensor
-                        to: "charging"
+                        segment_id: "{{ input.evening_segment_id }}"
+                        tipo_pulizia: "{{ input.evening_clean_type }}"
+                  - wait_template: >-
+                      {{ states[input.vacuum_sensor].state in input.end_states }}
           - service: input_boolean.turn_on
             target:
-              entity_id: !input cleaned_boolean
+              entity_id: !input cleaned_today
 mode: single
