@@ -3,6 +3,7 @@ blueprint:
   description: >-
     Blueprint per gestire un singolo task di pulizia mattutina o serale (in casa/fuori) con script.pulisci_stanza.
   domain: automation
+
   input:
     morning_time:
       name: "Orario pulizia mattutina"
@@ -67,7 +68,10 @@ blueprint:
     morning_segment:
       name: "Segment ID mattino"
       selector:
-        number: {}
+        number:
+          min: 1
+          max: 100
+          step: 1
     morning_type:
       name: "Tipo pulizia mattino"
       selector:
@@ -80,7 +84,10 @@ blueprint:
     evening_segment:
       name: "Segment ID sera"
       selector:
-        number: {}
+        number:
+          min: 1
+          max: 100
+          step: 1
     evening_type:
       name: "Tipo pulizia sera"
       selector:
@@ -93,7 +100,10 @@ blueprint:
     away_segment:
       name: "Segment ID sera (fuori)"
       selector:
-        number: {}
+        number:
+          min: 1
+          max: 100
+          step: 1
     away_type:
       name: "Tipo pulizia sera (fuori)"
       selector:
@@ -103,6 +113,7 @@ blueprint:
             - lavaggio
             - genius
             - genius_deep
+
 trigger:
   - platform: time
     at: !input morning_time
@@ -110,7 +121,9 @@ trigger:
   - platform: time
     at: !input evening_time
     id: evening
+
 condition: []
+
 action:
   - choose:
       - conditions:
