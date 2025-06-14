@@ -39,7 +39,7 @@ blueprint:
             - domenica
           multiple: true
     cleaned_boolean:
-      name: Flag pulizia effettuata (cleaned_today)
+      name: Flag pulizia effettuata
       selector:
         entity:
           domain: input_boolean
@@ -71,11 +71,11 @@ blueprint:
         list:
           min: 1
           object:
-            segment_id:
+            - key: segment_id
               name: Segment ID
               selector:
                 number: {}
-            tipo_pulizia:
+            - key: tipo_pulizia
               name: Tipo pulizia
               selector:
                 select:
@@ -91,11 +91,11 @@ blueprint:
         list:
           min: 1
           object:
-            segment_id:
+            - key: segment_id
               name: Segment ID
               selector:
                 number: {}
-            tipo_pulizia:
+            - key: tipo_pulizia
               name: Tipo pulizia
               selector:
                 select:
@@ -111,11 +111,11 @@ blueprint:
         list:
           min: 1
           object:
-            segment_id:
+            - key: segment_id
               name: Segment ID
               selector:
                 number: {}
-            tipo_pulizia:
+            - key: tipo_pulizia
               name: Tipo pulizia
               selector:
                 select:
@@ -142,11 +142,11 @@ action:
             value_template: >-
               {{ trigger.id == 'morning'
                  and now().strftime('%A').lower()
-                     in (input.days_morning | map('lower') | list)
-                 and is_state(input.cleaned_boolean, 'off') }}
+                     in (!input days_morning | map('lower') | list)
+                 and is_state(!input cleaned_boolean, 'off') }}
         sequence:
           - repeat:
-              for_each: "{{ input.tasks_morning }}"
+              for_each: "{{ !input tasks_morning }}"
               sequence:
                 - service: script.turn_on
                   target:
@@ -155,8 +155,8 @@ action:
                     variables:
                       segment_id: "{{ repeat.item.segment_id }}"
                       tipo_pulizia: "{{ repeat.item.tipo_pulizia }}"
-                - wait_template: >
-                    {{ states[input.vacuum_status_sensor].state in input.wait_states }}
+                - wait_template: >-
+                    {{ states[!input vacuum_status_sensor].state in (!input wait_states) }}
           - service: input_boolean.turn_on
             target:
               entity_id: !input cleaned_boolean
@@ -166,7 +166,7 @@ action:
             value_template: >-
               {{ trigger.id == 'evening'
                  and now().strftime('%A').lower()
-                     in (input.days_evening | map('lower') | list) }}
+                     in (!input days_evening | map('lower') | list) }}
         sequence:
           - choose:
               - conditions:
@@ -175,7 +175,7 @@ action:
                     state: '1'
                 sequence:
                   - repeat:
-                      for_each: "{{ input.tasks_evening_away }}"
+                      for_each: "{{ !input tasks_evening_away }}"
                       sequence:
                         - service: script.turn_on
                           target:
@@ -184,11 +184,11 @@ action:
                             variables:
                               segment_id: "{{ repeat.item.segment_id }}"
                               tipo_pulizia: "{{ repeat.item.tipo_pulizia }}"
-                        - wait_template: >
-                            {{ states[input.vacuum_status_sensor].state in input.wait_states }}
+                        - wait_template: >-
+                            {{ states[!input vacuum_status_sensor].state in (!input wait_states) }}
               - default:
                   - repeat:
-                      for_each: "{{ input.tasks_evening_default }}"
+                      for_each: "{{ !input tasks_evening_default }}"
                       sequence:
                         - service: script.turn_on
                           target:
@@ -197,8 +197,8 @@ action:
                             variables:
                               segment_id: "{{ repeat.item.segment_id }}"
                               tipo_pulizia: "{{ repeat.item.tipo_pulizia }}"
-                        - wait_template: >
-                            {{ states[input.vacuum_status_sensor].state in input.wait_states }}
+                        - wait_template: >-
+                            {{ states[!input vacuum_status_sensor].state in (!input wait_states) }}
           - service: input_boolean.turn_on
             target:
               entity_id: !input cleaned_boolean
